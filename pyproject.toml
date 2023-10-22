@@ -12,6 +12,7 @@ numpy = "^1.21"
 torch = "^1.7"
 networkx = "^2.2"
 PyYAML = ">=6.0"
+matplotlib = "^3.5"
 
 
 [build-system]
