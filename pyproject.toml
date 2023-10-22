@@ -1,0 +1,19 @@
+[tool.poetry]
+name = "motion"
+version = "0.1.0"
+description = "motion represetation for Generative AI."
+authors = ["nathansala <natouda@gmail.com>"]
+license = "MIT"
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.8"
+numpy = "^1.21"
+torch = "^1.7"
+networkx = "^2.2"
+PyYAML = ">=6.0"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
