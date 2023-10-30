@@ -1,4 +1,4 @@
-name: Pylint
+name: Pytest
 
 on: [push]
 
@@ -21,7 +21,6 @@ jobs:
           poetry install --with dev
         # python -m pip install --upgrade pip
         # pip install pylint
-    - name: Analysing the code with pylint
+    - name: Run tests using pytest.
       run: |
         poetry run pytest tests/
-        # pylint $(git ls-files '*.py')
