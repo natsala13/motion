@@ -1,3 +1,5 @@
+'''Tranformation to the static skeleton utils'''
+
 import copy
 
 import numpy as np
@@ -6,7 +8,8 @@ from Motion.Quaternions import Quaternions
 from Motion.AnimationStructure import children_list, get_sorted_order
 
 
-def expand_topology_edges(anim, req_joint_idx=None, names=None, offset_len_mean=None, nearest_joint_ratio=0.9):
+def expand_topology_edges(anim, req_joint_idx=None, names=None,
+                             offset_len_mean=None, nearest_joint_ratio=0.9):
     assert nearest_joint_ratio == 1, 'currently not supporting nearest_joint_ratio != 1'
 
     # we do not want to change inputs that are given as views
@@ -37,15 +40,17 @@ def expand_topology_edges(anim, req_joint_idx=None, names=None, offset_len_mean=
 
     # find out how many joints have multiple children
     super_parents = np.where(n_children_req > 1)[0]
-    n_super_children = n_children_req[super_parents].sum().astype(int) # total num of multiple children
+    n_super_children = n_children_req[super_parents].sum().astype(int) # total num of children
 
     if n_super_children == 0:
         return anim, req_joint_idx, names, offset_len_mean  # can happen in lower hierarchy levels
 
     # prepare space for expanded joints, at the end of each array
     anim.offsets = np.append(anim.offsets, np.zeros(shape=(n_super_children,3)), axis=0)
-    anim.positions = np.append(anim.positions, np.zeros(shape=(n_frames, n_super_children,3)), axis=1)
-    anim.rotations = Quaternions(np.append(anim.rotations, Quaternions.id((n_frames, n_super_children)), axis=1))
+    anim.positions = np.append(anim.positions,
+                                 np.zeros(shape=(n_frames, n_super_children,3)), axis=1)
+    anim.rotations = Quaternions(np.append(anim.rotations,
+                                 Quaternions.id((n_frames, n_super_children)), axis=1))
     anim.orients = Quaternions(np.append(anim.orients, Quaternions.id(n_super_children), axis=0))
     anim.parents = np.append(anim.parents, np.zeros(n_super_children, dtype=int))
     names = np.append(names, np.zeros(n_super_children, dtype='<U40'))

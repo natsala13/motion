@@ -1,9 +1,10 @@
+'''Class representing a motion skeleton and any static data of a motion.'''
 import functools
 
 import numpy as np
 
 from Motion import BVH
-from utils.utils import StaticConfig, EdgePoint
+from motion.utils.utils import StaticConfig, EdgePoint
 
 
 class StaticMotionOneHierarchyLevel:
@@ -11,11 +12,12 @@ class StaticMotionOneHierarchyLevel:
 
     Attributes:
         parents: List of parents  at specific hierarchy level - representing the skeleton.
-        pooling_list: Dictionary from every joint in that hierarchy level to the skeleton in the next one.
+        pooling_list: Dictionary from every joint in that hierarchy level to the next one.
         use_global_position: flag whether the model is using global position.
         feet_indices list on feet indices in case foot_contact is on o.w empty list.
     """
-    def __init__(self, parents: [int], pooling_list: {int: [int]},  use_global_position: bool, feet_indices: [str]):
+    def __init__(self, parents: [int], pooling_list: {int: [int]},
+                  use_global_position: bool, feet_indices: [str]):
         self.parents = parents
         self.pooling_list = pooling_list
         self.use_global_position = use_global_position
@@ -44,10 +46,12 @@ class StaticMotionOneHierarchyLevel:
         # In case debug is needed to be compared to older method.
         if not parents:
             parents = self.parents
-        return parents + ([-2] if self.use_global_position else []) + ([(-3, index) for index in self.feet_indices])
+        return parents + ([-2] if self.use_global_position else []) + \
+                         ([(-3, index) for index in self.feet_indices])
 
 
 class StaticData:
+    '''Static data of a motion - the skeleton in addition to any data not depending on frame time'''
     def __init__(self, parents: [int], offsets: np.array, names: [str], character_name: str,
                  n_channels=4, enable_global_position=False, enable_foot_contact=False,
                  rotation_representation='quaternion'):
@@ -55,7 +59,9 @@ class StaticData:
         self.names = names.copy() if names is not None else None
         self.config = StaticConfig(character_name)
 
-        self.parents_list, self.skeletal_pooling_dist_1_edges = self.calculate_all_pooling_levels(parents)
+        self.parents_list, self.skeletal_pooling_dist_1_edges = \
+                                                        self.calculate_all_pooling_levels(parents)
+
         self.skeletal_pooling_dist_1 = [{edge[1]: [e[1] for e in pooling[edge]] for edge in pooling}
                                         for pooling in self.skeletal_pooling_dist_1_edges]
 
@@ -77,7 +83,7 @@ class StaticData:
 
     @classmethod
     def init_from_bvh(cls, bvf_filepath: str, *args, **kwargs):
-        animation, names, frametime = BVH.load(bvf_filepath)
+        animation, names, _ = BVH.load(bvf_filepath)
         return cls(animation.parents, animation.offsets, names, *args, **kwargs)
 
     @classmethod
@@ -86,9 +92,11 @@ class StaticData:
         return cls(motion['parents_with_root'], offsets, motion['names_with_root'], **kwargs)
 
     @classmethod
-    def init_joint_static(cls, joint: Joint, **kwargs):
-        motion_statics = cls(joint.parents_list[-1], offsets=None, names=joint.parents_list[-1], n_channels=3,
-                     enable_foot_contact=False, rotation_representation=False, **kwargs)
+    def init_joint_static(cls, joint, **kwargs):
+        motion_statics = cls(joint.parents_list[-1], offsets=None,
+                             names=joint.parents_list[-1], n_channels=3,
+                            enable_foot_contact=False, rotation_representation=False, **kwargs)
+
         motion_statics.parents_list = joint.parents_list
         motion_statics.skeletal_pooling_dist_1 = joint.skeletal_pooling_dist_1
         motion_statics.skeletal_pooling_dist_0 = joint.skeletal_pooling_dist_0
@@ -139,13 +147,14 @@ class StaticData:
         """
         add a special entity that would be the global position.
         The entity is appended to the edges list.
-        No need to really add it in edges_list and all the other structures that are based on tuples. We add it only
-        to the structures that are based on indices.
+        No need to really add it in edges_list and all other structures that are based on tuples.
+        We add it only to the structures that are based on indices.
         Its neighboring edges are the same as the neighbors of root """
         for pooling_list in [self.skeletal_pooling_dist_0, self.skeletal_pooling_dist_1]:
             for pooling_hierarchical_stage in pooling_list:
                 n_small_stage = max(pooling_hierarchical_stage.keys()) + 1
-                n_large_stage = max(val for edge in pooling_hierarchical_stage.values() for val in edge) + 1
+                n_large_stage = max(val for edge in pooling_hierarchical_stage.values()
+                                     for val in edge) + 1
                 pooling_hierarchical_stage[n_small_stage] = [n_large_stage]
 
     @property
@@ -154,15 +163,13 @@ class StaticData:
 
     @property
     @functools.lru_cache()
-    def foot_indexes(self, include_toes=True):
+    def foot_indexes(self):
         """Run overs pooling list and calculate foot location at each level"""
-        # feet_names = [LEFT_FOOT_NAME, LEFT_TOE, RIGHT_FOOT_NAME, RIGHT_TOE] if include_toes else [LEFT_FOOT_NAME,
-        #                                                                                           RIGHT_FOOT_NAME]
-
         indexes = [i for i, name in enumerate(self.names) if name in self.foot_names]
         all_foot_indexes = [indexes]
         for pooling in self.skeletal_pooling_dist_1[::-1]:
-            all_foot_indexes += [[k for k in pooling if any(foot in pooling[k] for foot in all_foot_indexes[-1])]]
+            all_foot_indexes += [[k for k in pooling if any(foot in pooling[k]
+                                    for foot in all_foot_indexes[-1])]]
 
         return all_foot_indexes[::-1]
 
@@ -173,32 +180,40 @@ class StaticData:
     def _enable_foot_contact(self):
         """ add special entities that would be the foot contact labels.
         The entities are appended to the edges list.
-        No need to really add them in edges_list and all the other structures that are based on tuples. We add them only
-        to the structures that are based on indices.
+        No need to really add them in edges_list and all other structures that are based on tuples.
+        We add them only to the structures that are based on indices.
         Their neighboring edges are the same as the neighbors of the feet """
         for pooling_list in [self.skeletal_pooling_dist_0, self.skeletal_pooling_dist_1]:
             for pooling_hierarchical_stage, foot_indexes in zip(pooling_list, self.foot_indexes):
                 for _ in foot_indexes:
                     n_small_stage = max(pooling_hierarchical_stage.keys()) + 1
-                    n_large_stage = max(val for edge in pooling_hierarchical_stage.values() for val in edge) + 1
+                    n_large_stage = max(val for edge in pooling_hierarchical_stage.values()
+                                        for val in edge) + 1
                     pooling_hierarchical_stage[n_small_stage] = [n_large_stage]
 
-    def hierarchical_upsample_layer(self, layer: int, pooling_dist=1) -> StaticMotionOneHierarchyLevel:
+    def hierarchical_upsample_layer(self,
+                                    layer: int,
+                                     pooling_dist=1) -> StaticMotionOneHierarchyLevel:
+
         assert pooling_dist in [0, 1]
-        skeletal_pooling_dist = self.skeletal_pooling_dist_1 if pooling_dist == 1 else self.skeletal_pooling_dist_0
+        skeletal_pooling_dist = self.skeletal_pooling_dist_1 if pooling_dist == 1 \
+                                                            else self.skeletal_pooling_dist_0
 
         return StaticMotionOneHierarchyLevel(self.parents_list[layer],
                                              skeletal_pooling_dist[layer - 1],
                                              self.enable_global_position,
-                                             self.foot_indexes[layer] if self.enable_foot_contact else [])
+                                             self.foot_indexes[layer] if self.enable_foot_contact
+                                                                      else [])
 
     def hierarchical_keep_dim_layer(self, layer: int) -> StaticMotionOneHierarchyLevel:
         return StaticMotionOneHierarchyLevel.keep_dim_layer(self.parents_list[layer],
                                                             self.enable_global_position,
-                                                            self.foot_indexes[layer] if self.enable_foot_contact else [])
-    
+                                    self.foot_indexes[layer] if self.enable_foot_contact else [])
+
     def number_of_joints_in_hierarchical_levels(self) -> [int]:
-        feet_lengths = [len(feet) for feet in self.foot_indexes] if self.enable_foot_contact else [0] * len(self.parents_list)
+        feet_lengths = [len(feet) for feet in self.foot_indexes] if self.enable_foot_contact \
+                                                                 else [0] * len(self.parents_list)
+
         return [len(parents) + self.enable_global_position + feet_length
                  for parents, feet_length in zip(self.parents_list, feet_lengths)]
 
@@ -232,7 +247,8 @@ class StaticData:
 
     @staticmethod
     def _find_leaves(index: int, joints_degree: [int], parents: [int]) -> [[int]]:
-        """Recursive search to find a list of all leaves and their connected joint in a skeleton rest position"""
+        """Recursive search to find a list of all leaves and their connected
+         joint in a skeleton rest position"""
         if joints_degree[index] == 0:
             return []
 
@@ -255,13 +271,14 @@ class StaticData:
 
     @staticmethod
     def _edges_from_joints(joints: [int]):
-        return [(src, dst) for src, dst in zip(joints[:-1], joints[1:])]
+        return list(zip(joints[:-1], joints[1:]))
 
     @staticmethod
     def _pooling_for_edges_list(edges: [EdgePoint]) -> list:
         """Return a list sublist of edges of length 2."""
         pooling_groups = [edges[i:i + 2] for i in range(0, len(edges), 2)]
-        if len(pooling_groups) > 1 and len(pooling_groups[-1]) == 1:  # If we have an odd numbers of edges pull 3 of them in once.
+        # If we have an odd numbers of edges pull 3 of them in once.
+        if len(pooling_groups) > 1 and len(pooling_groups[-1]) == 1:
             pooling_groups[-2] += pooling_groups[-1]
             pooling_groups = pooling_groups[:-1]
 
@@ -277,8 +294,10 @@ class StaticData:
         all_sequences = StaticData._find_seq(0, degree, parents)
         edges_sequences = [StaticData._edges_from_joints(seq) for seq in all_sequences]
 
-        pooling = [{(edge[0][0], edge[-1][-1]): edge for edge in StaticData._pooling_for_edges_list(edges)} for edges in
-                   edges_sequences]
+        pooling = [{(edge[0][0], edge[-1][-1]): edge
+                    for edge in StaticData._pooling_for_edges_list(edges)}
+                     for edges in edges_sequences]
+
         pooling = StaticData.flatten_dict(pooling)
 
         return pooling
@@ -294,14 +313,15 @@ class StaticData:
         for joint in all_joints:
             pooling[joint] = [edge[0] for edge in edges_sequences if edge[0][0] == joint]
 
-        return {pooling[k][0]: pooling[k] for k in pooling}
+        # return {pooling[k][0]: pooling[k] for k in pooling}
+        return {value[0]: value for _, value in pooling.items()}
 
     @staticmethod
     def _calculate_pooling_for_level(parents: [int], degree: [int]) -> {EdgePoint: [EdgePoint]}:
         if any(d == 1 for d in degree):
             return StaticData._calculate_degree1_pooling(parents, degree)
-        else:
-            return StaticData._calculate_leaves_pooling(parents, degree)
+
+        return StaticData._calculate_leaves_pooling(parents, degree)
 
     @staticmethod
     def _normalise_joints(pooling: {EdgePoint: [EdgePoint]}) -> {EdgePoint: [EdgePoint]}:

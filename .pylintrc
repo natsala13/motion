@@ -1,0 +1,6 @@
+[MAIN]
+disable=C0116, # function doc
+	R0913, # too many arguments in function > 5.
+	R0902, # too many class fields > 7.  
+	R0914, # too many local variables.
+	W1514, # opening a file without specifing format.
