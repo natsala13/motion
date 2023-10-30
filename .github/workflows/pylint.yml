@@ -23,5 +23,5 @@ jobs:
         # pip install pylint
     - name: Analysing the code with pylint
       run: |
-        pylint motion/
+        poetry run pylint motion/
         # pylint $(git ls-files '*.py')
